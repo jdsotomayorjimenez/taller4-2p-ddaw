@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { FotosService } from './fotos.service.js';
-import type { Foto } from './entities/foto.entity.js';
+import type { DatosFoto } from './fotos.service.js';
 
 @Controller('fotos')
 export class FotosController {
@@ -19,14 +19,14 @@ export class FotosController {
     }
 
     @Post()
-    create(@Body() datos: Omit<Foto, 'id'>) {
+    create(@Body() datos: DatosFoto) {
         return this.fotosService.create(datos);
     }
 
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() datos: Partial<Omit<Foto, 'id'>>,
+        @Body() datos: Partial<DatosFoto>,
     ) {
         return this.fotosService.update(id, datos);
     }

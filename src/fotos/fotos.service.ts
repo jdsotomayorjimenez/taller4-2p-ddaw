@@ -1,39 +1,57 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Foto } from './entities/foto.entity.js';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Foto } from './entities/foto.entity.js';
+
+export type DatosFoto = Pick<Foto, 'titulo' | 'descripcion' | 'calificacion' | 'ruta'>;
 
 @Injectable()
 export class FotosService {
-    private fotos: Foto[] = [
-        { id: 1, titulo: 'Atardecer', calificacion: 4.5 },
-        { id: 2, titulo: 'Malecón', calificacion: 4.0 },
-    ];
-    private siguienteId = 3;
+    constructor(
+        @InjectRepository(Foto)
+        private readonly fotosRepo: Repository<Foto>,
+    ) {}
 
-    findAll(): Foto[] {
-        return this.fotos;
+    findAll(): Promise<Foto[]> {
+        return this.fotosRepo.find({ order: { id: 'ASC' } });
     }
 
-    findOne(id: number): Foto {
-        const foto = this.fotos.find((f) => f.id === id);
+    async findOne(id: number, fotosRepo = this.fotosRepo): Promise<Foto> {
+        const foto = await fotosRepo.findOne({
+            where: { id },
+            lock: fotosRepo.queryRunner?.isTransactionActive ? { mode: 'pessimistic_write' } : undefined,
+        });
         if (!foto) {
             throw new NotFoundException(`Foto ${id} no encontrada`);
         }
         return foto;
     }
-    create(datos: Omit<Foto, 'id'>): Foto {
-        const nueva = { ...datos, id: this.siguienteId++ };
-        this.fotos.push(nueva);
-        return nueva;
+
+    create({ titulo, descripcion, calificacion, ruta }: DatosFoto): Promise<Foto> {
+        if (typeof titulo !== 'string' || !titulo.trim()) {
+            throw new BadRequestException('El título es obligatorio');
+        }
+        const foto = this.fotosRepo.create({ titulo, descripcion, calificacion, ruta });
+        return this.fotosRepo.save(foto);
     }
 
-    update(id: number, datos: Partial<Omit<Foto, 'id'>>): Foto {
-        const foto = this.findOne(id);
-        Object.assign(foto, datos, { id });
-        return foto;
+    async update(id: number, { titulo, descripcion, calificacion, ruta }: Partial<DatosFoto>): Promise<Foto> {
+        if (titulo !== undefined && (typeof titulo !== 'string' || !titulo.trim())) {
+            throw new BadRequestException('El título es obligatorio');
+        }
+        return this.fotosRepo.manager.transaction(async manager => {
+            const fotosRepo = manager.getRepository(Foto);
+            const foto = await this.findOne(id, fotosRepo);
+            fotosRepo.merge(foto, { titulo, descripcion, calificacion, ruta });
+            return fotosRepo.save(foto);
+        });
     }
 
-    remove(id: number): void {
-        this.findOne(id);
-        this.fotos = this.fotos.filter((f) => f.id !== id);
+    async remove(id: number): Promise<void> {
+        await this.fotosRepo.manager.transaction(async manager => {
+            const fotosRepo = manager.getRepository(Foto);
+            const foto = await this.findOne(id, fotosRepo);
+            await fotosRepo.remove(foto);
+        });
     }
 }
