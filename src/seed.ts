@@ -2,34 +2,38 @@ import { NestFactory } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module.js';
 import { Foto } from './fotos/entities/foto.entity.js';
+import { Album } from './albumes/entities/albumes.entity.js';
+import { Etiqueta } from './fotos/entities/etiqueta.entity.js';
 
 const app = await NestFactory.createApplicationContext(AppModule);
 
 try {
-    const dataSource = app.get(DataSource);
-    const insertadas = await dataSource.transaction('SERIALIZABLE', async (manager) => {
+    const ds = app.get(DataSource);
+    await ds.transaction(async (manager) => {
+        await manager.query(
+            'TRUNCATE fotos_etiquetas, fotos, etiquetas, albumes RESTART IDENTITY CASCADE',
+        );
+        const albumes = await manager.getRepository(Album).save(
+            ['Viajes', 'Guayaquil', 'Naturaleza'].map((nombre) => ({ nombre })),
+        );
+        const etiquetas = await manager.getRepository(Etiqueta).save(
+            ['playa', 'ciudad', 'noche', 'cielo', 'montaña', 'río'].map((texto) => ({ texto })),
+        );
         const fotosRepo = manager.getRepository(Foto);
-        if (await fotosRepo.count() > 0) {
-            return 0;
-        }
+        const azar = <T>(lista: T[]) => lista[Math.floor(Math.random() * lista.length)];
 
-        const fotos = Array.from({ length: 10 }, (_, indice) => {
-            const i = indice + 1;
-            return {
+        for (let i = 1; i <= 20; i++) {
+            await fotosRepo.save({
                 titulo: `Foto ${i}`,
-                descripcion: `Descripción de la foto ${i}`,
-                calificacion: i === 3 ? 4.5 : Math.round(Math.random() * 50) / 10,
+                calificacion: Math.round(Math.random() * 50) / 10,
                 ruta: `https://picsum.photos/id/${i * 10}/600/400`,
-            };
-        });
-
-        await fotosRepo.save(fotos);
-        return fotos.length;
+                album: azar(albumes),
+                etiquetas: [...new Set([azar(etiquetas), azar(etiquetas)])],
+            });
+        }
     });
 
-    console.log(insertadas > 0
-        ? `✓ ${insertadas} fotos insertadas`
-        : 'La tabla ya contiene fotos. Se omitió la carga.');
+    console.log('✓ 20 fotos, 3 álbumes y 6 etiquetas insertados');
 } finally {
     await app.close();
 }

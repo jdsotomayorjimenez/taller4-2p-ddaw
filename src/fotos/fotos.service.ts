@@ -1,9 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, ILike, Repository } from 'typeorm';
 import { Foto } from './entities/foto.entity.js';
 
 export type DatosFoto = Pick<Foto, 'titulo' | 'descripcion' | 'calificacion' | 'ruta'>;
+
+export interface FiltroFotos {
+    min: number;
+    max: number;
+    q?: string;
+    page: number;
+    limit: number;
+}
 
 @Injectable()
 export class FotosService {
@@ -12,14 +20,30 @@ export class FotosService {
         private readonly fotosRepo: Repository<Foto>,
     ) {}
 
-    findAll(): Promise<Foto[]> {
-        return this.fotosRepo.find({ order: { id: 'ASC' } });
+    async findAll({ min, max, q, page, limit }: FiltroFotos) {
+        if (page < 1 || limit < 1) {
+            throw new BadRequestException('page y limit deben ser mayores que cero');
+        }
+
+        const [data, total] = await this.fotosRepo.findAndCount({
+            where: {
+                calificacion: Between(min, max),
+                ...(q && { titulo: ILike(`%${q}%`) }),
+            },
+            relations: { etiquetas: true },
+            order: { id: 'ASC' },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+        return { data, total, page, limit };
     }
 
     async findOne(id: number, fotosRepo = this.fotosRepo): Promise<Foto> {
+        const enTransaccion = fotosRepo.queryRunner?.isTransactionActive;
         const foto = await fotosRepo.findOne({
             where: { id },
-            lock: fotosRepo.queryRunner?.isTransactionActive ? { mode: 'pessimistic_write' } : undefined,
+            relations: enTransaccion ? undefined : { album: true, etiquetas: true },
+            lock: enTransaccion ? { mode: 'pessimistic_write' } : undefined,
         });
         if (!foto) {
             throw new NotFoundException(`Foto ${id} no encontrada`);
