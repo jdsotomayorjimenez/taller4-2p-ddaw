@@ -6,20 +6,23 @@ API desarrollada con NestJS y TypeScript para listar fotos, consultar una por ID
 
 - [Taller 4 · CRUD con almacenamiento en memoria](#taller-4)
 - [Taller 5 · Persistencia con PostgreSQL y TypeORM](#taller-5)
+- [Taller 6 · Álbumes, etiquetas, filtros y paginación](#taller-6)
 
 ## Rutas de la API
 
-La API está disponible en `http://localhost:3000/api/fotos`. El puerto predeterminado es 3000 y puede cambiarse con la variable de entorno `PORT`.
+En `taller-6`, la URL base es `http://localhost:3000/api`. El puerto predeterminado es 3000 y puede cambiarse con la variable de entorno `PORT`.
 
 | Método | Ruta | Descripción | Respuesta exitosa |
 | --- | --- | --- | --- |
-| GET | `/api/fotos` | Listar fotos | 200, arreglo de fotos |
-| GET | `/api/fotos/:id` | Consultar una foto por ID | 200, foto encontrada |
+| GET | `/api/fotos` | Listar fotos con filtros y paginación | 200, `{ data, total, page, limit }` |
+| GET | `/api/fotos/:id` | Consultar una foto con su álbum y etiquetas | 200, foto encontrada |
 | POST | `/api/fotos` | Crear una foto | 201, foto creada |
 | PATCH | `/api/fotos/:id` | Actualizar parcialmente una foto | 200, foto actualizada |
 | DELETE | `/api/fotos/:id` | Eliminar una foto | 204, sin cuerpo |
+| GET | `/api/albumes` | Listar álbumes | 200, arreglo de álbumes |
+| GET | `/api/albumes/:id/fotos` | Consultar un álbum con sus fotos | 200, álbum con el arreglo `fotos` |
 
-Las rutas con `:id` usan `ParseIntPipe`: un ID no numérico devuelve 400. Si el ID es válido pero la foto no existe, GET, PATCH y DELETE devuelven 404 con el mensaje `Foto <id> no encontrada`.
+Las rutas con `:id` usan `ParseIntPipe`. Un ID no numérico devuelve 400 y un ID inexistente devuelve 404.
 
 ## Taller 4
 
@@ -193,7 +196,7 @@ La API guarda las fotos en PostgreSQL mediante TypeORM. `Foto` se registra como 
 
 ### Ejecución del Taller 5
 
-Se necesita Node.js 24, npm y un servidor PostgreSQL local activo. Crea la base `album` si todavía no existe. Si aún no tienes un `.env`, copia la plantilla desde la raíz del proyecto. [Plantilla de configuración](.env.example)
+Estos pasos reproducen la versión de la rama `taller-5`. Se necesita Node.js 24, npm y un servidor PostgreSQL local activo. Crea la base `album` si todavía no existe. Si aún no tienes un `.env`, copia la plantilla desde la raíz del proyecto. [Plantilla de configuración](.env.example)
 
 ```bash
 cp .env.example .env
@@ -270,3 +273,69 @@ Para probar la eliminación, `POST /api/fotos` creó `Foto temporal` con ID `12`
 `DELETE /api/fotos/12` busca la entidad y la elimina con `remove()`. Postman muestra `204 No Content` con el cuerpo vacío.
 
 ![Eliminación de la foto temporal con respuesta 204](capturas/taller-5/11.png)
+
+## Taller 6
+
+Un álbum puede tener varias fotos y cada foto puede pertenecer a un álbum. Una foto también puede tener varias etiquetas, compartidas con otras fotos mediante la tabla `fotos_etiquetas`.
+
+### Ejecución del Taller 6
+
+1. Usa la base local `album`. Si todavía no existe, abre el **Query Tool** de la base `postgres` en pgAdmin y ejecuta `CREATE DATABASE album;`.
+2. En la raíz del proyecto, copia `.env.example` a `.env` si todavía no existe. Configura `DB_NAME=album`, `DB_HOST=localhost`, `DB_PORT=5432`, `PORT=3000` y las credenciales de tu PostgreSQL local.
+3. Detén la API si ya está corriendo. Desde la raíz del proyecto ejecuta estos comandos y deja la terminal abierta.
+
+```bash
+npm ci
+npm run seed
+npm run start:dev
+```
+
+El seed vacía las tablas del taller, reinicia sus IDs y carga 20 fotos, 3 álbumes y 6 etiquetas. Si necesitas conservar los datos actuales de `album`, respáldalos antes de ejecutarlo. Las calificaciones y las asignaciones de álbumes y etiquetas varían con cada carga.
+
+![Ejecución del seed con 20 fotos, 3 álbumes y 6 etiquetas](capturas/taller-6/1.png)
+
+### Pruebas en Postman
+
+En Postman, selecciona **GET**, escribe la URL y deja **Body → none**. Para los filtros, puedes digitar cada parámetro en las columnas **Key** y **Value** de la pestaña **Params**. Pulsa **Send** y revisa el estado y el cuerpo de la respuesta.
+
+#### Filtro por calificación y paginación
+
+`GET /api/fotos?min=3&max=5&page=1&limit=3` devuelve `200 OK`. En esta ejecución hubo 7 coincidencias. La primera página contiene 3 fotos con sus etiquetas y la respuesta muestra `total: 7`, `page: 1` y `limit: 3`.
+
+![Filtro por calificación con las etiquetas de una foto](capturas/taller-6/2.png)
+
+![Final del listado filtrado con el total y la paginación](capturas/taller-6/2.1.png)
+
+#### Búsqueda por título
+
+`GET /api/fotos?q=Foto%201` devuelve `200 OK`. En **Params**, el valor de `q` es `Foto 1`. La búsqueda encuentra 11 coincidencias y devuelve las primeras 10, con `page: 1` y `limit: 10`.
+
+![Búsqueda de fotos con el parámetro q](capturas/taller-6/3.png)
+
+![Final de la primera página con 11 coincidencias en total](capturas/taller-6/3.1.png)
+
+#### Fotos del álbum Viajes
+
+`GET /api/albumes/1/fotos` devuelve `200 OK`, el álbum con `id: 1`, el nombre `Viajes` y el arreglo `fotos`. El ID se escribe en la ruta y **Params** queda vacío.
+
+![Álbum Viajes con el inicio del arreglo de fotos](capturas/taller-6/4.png)
+
+![Final del arreglo de fotos del álbum Viajes](capturas/taller-6/4.1.png)
+
+#### Validación de un parámetro inválido
+
+`GET /api/fotos?min=abc` devuelve `400 Bad Request` con el mensaje `Validation failed (numeric string is expected)`.
+
+![Respuesta 400 al enviar un valor de texto en min](capturas/taller-6/5.png)
+
+### Verificación en pgAdmin
+
+En el **Query Tool** de la base `album`, la consulta devolvió 37 vínculos con las columnas `foto_id` y `etiqueta_id`.
+
+```sql
+SELECT foto_id, etiqueta_id
+FROM public.fotos_etiquetas
+ORDER BY foto_id, etiqueta_id;
+```
+
+![Tabla de vínculos entre fotos y etiquetas con 37 filas en pgAdmin](capturas/taller-6/6.png)
