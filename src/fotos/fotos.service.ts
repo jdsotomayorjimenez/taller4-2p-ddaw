@@ -11,6 +11,8 @@ export interface FiltroFotos {
     q?: string;
     page: number;
     limit: number;
+    etiqueta?: string;
+    orden?: string;
 }
 
 @Injectable()
@@ -20,18 +22,29 @@ export class FotosService {
         private readonly fotosRepo: Repository<Foto>,
     ) {}
 
-    async findAll({ min, max, q, page, limit }: FiltroFotos) {
+    async findAll({ min, max, q, page, limit, etiqueta, orden }: FiltroFotos) {
         if (page < 1 || limit < 1) {
             throw new BadRequestException('page y limit deben ser mayores que cero');
+        }
+        if (etiqueta !== undefined && typeof etiqueta !== 'string') {
+            throw new BadRequestException('etiqueta debe ser un texto');
+        }
+        if (orden !== undefined && orden !== 'asc' && orden !== 'desc') {
+            throw new BadRequestException('orden debe ser asc o desc');
         }
 
         const [data, total] = await this.fotosRepo.findAndCount({
             where: {
                 calificacion: Between(min, max),
                 ...(q && { titulo: ILike(`%${q}%`) }),
+                ...(etiqueta && { etiquetas: { texto: etiqueta } }),
             },
-            relations: { etiquetas: true },
-            order: { id: 'ASC' },
+            relations: { etiquetas: true, album: true },
+            // Al filtrar por una etiqueta, carga todas las etiquetas de cada foto encontrada.
+            relationLoadStrategy: etiqueta ? 'query' : 'join',
+            order: orden
+                ? { calificacion: orden === 'asc' ? 'ASC' : 'DESC', id: 'ASC' }
+                : { id: 'ASC' },
             skip: (page - 1) * limit,
             take: limit,
         });
