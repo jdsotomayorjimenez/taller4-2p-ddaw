@@ -1,0 +1,61 @@
+@api = http://localhost:3000/api
+@albumId = 2
+@albumInexistenteId = 2147483647
+
+### Consultar los IDs de los álbumes
+GET {{api}}/albumes
+
+### Listar con filtros y paginación
+GET {{api}}/fotos?min=3&max=5&q=foto&page=1&limit=5
+
+### Crear una foto con álbum y etiquetas
+# @name crearFoto
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "Cerro Santa Ana",
+  "calificacion": 4.8,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": {{albumId}},
+  "etiquetas": ["Ciudad", "faro"]
+}
+
+### Rechazar un límite fuera de rango
+GET {{api}}/fotos?limit=999
+
+### Rechazar un cuerpo inválido
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "",
+  "calificacion": 9,
+  "ruta": "no-url",
+  "hack": 1
+}
+
+### Rechazar un álbum inexistente
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "Cerro Santa Ana",
+  "calificacion": 4.8,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": {{albumInexistenteId}}
+}
+
+### Actualizar parcialmente la foto creada
+PATCH {{api}}/fotos/{{crearFoto.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "calificacion": 2.5
+}
+
+### Eliminar la foto creada
+DELETE {{api}}/fotos/{{crearFoto.response.body.$.id}}
+
+### Comprobar que la foto eliminada devuelve 404
+GET {{api}}/fotos/{{crearFoto.response.body.$.id}}

@@ -1,12 +1,100 @@
 # Álbum de fotos con NestJS
 
-API de álbumes y fotos desarrollada con NestJS, TypeScript y PostgreSQL. El Taller 6 incorpora relaciones entre fotos, álbumes y etiquetas, y permite filtrar, ordenar y paginar el listado.
+API de álbumes y fotos desarrollada con NestJS, TypeScript y PostgreSQL. El Taller 7 valida las solicitudes del CRUD de fotos y traduce los errores de PostgreSQL a respuestas HTTP.
 
 **Autor** · Juan Diego Sotomayor
 
+- [Taller 7 · CRUD de fotos, validación y errores](#taller-7)
 - [Taller 6 · Álbumes, etiquetas, filtros y paginación](#taller-6)
 - [Taller 5 · Persistencia con PostgreSQL y TypeORM](#taller-5)
 - [Taller 4 · CRUD con almacenamiento en memoria](#taller-4)
+
+## Taller 7
+
+Los DTO validan el cuerpo de `POST` y `PATCH` y los parámetros de `GET /api/fotos`. El listado conserva los filtros y el orden del Taller 6, con un máximo de 50 fotos por página. Al crear o editar una foto se puede asociar un álbum por ID y enviar las etiquetas como texto. El servicio normaliza los textos y reutiliza las etiquetas existentes.
+
+### Ejecución del Taller 7
+
+Usa la base local `album` del Taller 6 y configura la conexión en `.env` con los campos de [`.env.example`](.env.example).
+
+```bash
+npm ci
+npm run start:dev
+```
+
+La URL base es `http://localhost:3000/api`. Consulta `GET /api/albumes` para elegir un ID válido. En estas pruebas se utilizó el álbum Guayaquil, con ID `2`. Las solicitudes de ejemplo están en [`api.http`](api.http).
+
+### Pruebas en Postman y pgAdmin
+
+En Postman usa **Body → raw → JSON** para `POST` y `PATCH`, y **Body → none** para `GET` y `DELETE`.
+
+#### Crear una foto con álbum y etiquetas
+
+`POST /api/fotos` devolvió `201 Created` y creó «Cerro Santa Ana» con ID `21`, el álbum Guayaquil y las etiquetas `ciudad` y `faro`.
+
+```json
+{
+  "titulo": "Cerro Santa Ana",
+  "calificacion": 4.8,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": 2,
+  "etiquetas": ["Ciudad", "faro"]
+}
+```
+
+![POST de Cerro Santa Ana con respuesta 201, álbum y etiquetas](capturas/taller-7/1.png)
+
+#### Verificar las relaciones en pgAdmin
+
+Antes de eliminar la foto, ejecuta la consulta en el **Query Tool** de la base `album`. Si repites la prueba, usa el ID que devolvió el POST.
+
+```sql
+SELECT f.id, f.titulo, a.nombre AS album, e.texto AS etiqueta
+FROM public.fotos AS f
+LEFT JOIN public.albumes AS a ON a.id = f."albumId"
+LEFT JOIN public.fotos_etiquetas AS fe ON fe.foto_id = f.id
+LEFT JOIN public.etiquetas AS e ON e.id = fe.etiqueta_id
+WHERE f.id = 21
+ORDER BY e.texto;
+```
+
+![pgAdmin muestra dos vínculos para la foto 21, con ciudad y faro](capturas/taller-7/2.png)
+
+#### Actualizar parcialmente la foto
+
+`PATCH /api/fotos/21` con `{"calificacion": 2.5}` devolvió `200 OK`. La nueva calificación se guardó y se conservaron el título, el álbum y las etiquetas.
+
+![PATCH de la foto 21 con calificación 2.5 y respuesta 200](capturas/taller-7/3.png)
+
+#### Eliminar la foto
+
+`DELETE /api/fotos/21` devolvió `204 No Content` con el cuerpo vacío.
+
+![DELETE de la foto 21 con respuesta 204](capturas/taller-7/4.png)
+
+#### Validar el límite de paginación
+
+`GET /api/fotos?limit=999` devolvió `400 Bad Request` con el mensaje `limit must not be greater than 50`. En Postman el parámetro `limit` se ingresó en **Params**.
+
+![GET con limit igual a 999 y respuesta 400](capturas/taller-7/5.png)
+
+#### Validar el cuerpo de la solicitud
+
+`POST /api/fotos` con `{"titulo": "", "calificacion": 9, "ruta": "no-url", "hack": 1}` devolvió `400 Bad Request`. La respuesta enumeró el título vacío, la calificación fuera de rango, la URL inválida y el campo extra.
+
+![POST con cuatro errores de validación en la respuesta 400](capturas/taller-7/6.png)
+
+#### Rechazar la referencia a un álbum inexistente
+
+`POST /api/fotos` con los datos válidos de «Cerro Santa Ana» y `albumId: 2147483467` devolvió `400 Bad Request` con el mensaje «Referencia a un registro inexistente». El filtro tradujo el error de clave foránea de PostgreSQL.
+
+![POST con un álbum inexistente y respuesta 400](capturas/taller-7/7.png)
+
+#### Consultar la foto eliminada desde el navegador
+
+Al abrir `http://localhost:3000/api/fotos/21` después del DELETE, la API devolvió `404 Not Found` con el mensaje «Foto 21 no encontrada».
+
+![Navegador con la respuesta 404 para la foto 21](capturas/taller-7/8.png)
 
 ## Taller 6
 
