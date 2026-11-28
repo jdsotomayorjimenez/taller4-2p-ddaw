@@ -1,10 +1,10 @@
 # Álbum de fotos con NestJS
 
-API de álbumes y fotos desarrollada con NestJS, TypeScript y PostgreSQL. El Taller 7 valida las solicitudes del CRUD de fotos y traduce los errores de PostgreSQL a respuestas HTTP.
+API de álbumes y fotos desarrollada con NestJS, TypeScript y PostgreSQL. El Taller 7 completa el CRUD de fotos y álbumes, valida las solicitudes con DTO y traduce los errores de PostgreSQL a respuestas HTTP.
 
 **Autor** · Juan Diego Sotomayor
 
-- [Taller 7 · CRUD de fotos, validación y errores](#taller-7)
+- [Taller 7 · CRUD de fotos y álbumes, validación y errores](#taller-7)
 - [Taller 6 · Álbumes, etiquetas, filtros y paginación](#taller-6)
 - [Taller 5 · Persistencia con PostgreSQL y TypeORM](#taller-5)
 - [Taller 4 · CRUD con almacenamiento en memoria](#taller-4)
@@ -95,6 +95,69 @@ ORDER BY e.texto;
 Al abrir `http://localhost:3000/api/fotos/21` después del DELETE, la API devolvió `404 Not Found` con el mensaje «Foto 21 no encontrada».
 
 ![Navegador con la respuesta 404 para la foto 21](capturas/taller-7/8.png)
+
+### Reto del Taller 7
+
+`CreateAlbumDto` valida que el nombre sea un texto obligatorio de hasta 80 caracteres. `UpdateAlbumDto` reutiliza esas reglas para las actualizaciones parciales. PostgreSQL garantiza que el nombre sea único y el filtro de TypeORM convierte el error de duplicado en `409 Conflict`. Los DTO de álbumes y fotos incluyen mensajes de validación en español.
+
+| Método | Ruta | Respuesta exitosa |
+| --- | --- | --- |
+| POST | `/api/albumes` | `201 Created` con el álbum creado |
+| PATCH | `/api/albumes/:id` | `200 OK` con el álbum actualizado |
+| DELETE | `/api/albumes/:id` | `204 No Content` |
+
+#### Crear un álbum
+
+`POST /api/albumes` con `{"nombre": "Paseo por el Malecón"}` devolvió `201 Created` y asignó el ID `4`.
+
+![POST del álbum Paseo por el Malecón con ID 4 y respuesta 201](capturas/taller-7/9.png)
+
+#### Rechazar un nombre duplicado
+
+Al repetir el POST con el mismo nombre, la API devolvió `409 Conflict` con el mensaje «El registro ya existe».
+
+![POST de un álbum con nombre duplicado y respuesta 409](capturas/taller-7/10.png)
+
+#### Validar el nombre obligatorio
+
+`POST /api/albumes` con `{"nombre": ""}` devolvió `400 Bad Request` con el mensaje «El nombre es obligatorio».
+
+![POST con nombre de álbum vacío y mensaje de validación en español](capturas/taller-7/11.png)
+
+#### Cambiar el nombre del álbum
+
+`PATCH /api/albumes/4` con `{"nombre": "Malecón al atardecer"}` devolvió `200 OK`. El álbum conservó el ID `4`.
+
+![PATCH del álbum 4 con el nombre actualizado](capturas/taller-7/12.png)
+
+#### Asociar una foto y eliminar el álbum
+
+`POST /api/fotos` con el siguiente cuerpo devolvió `201 Created` y creó la foto `23` dentro de «Malecón al atardecer».
+
+```json
+{
+  "titulo": "Atardecer en el Malecón",
+  "calificacion": 4.5,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": 4
+}
+```
+
+![POST de la foto 23 asociada al álbum 4](capturas/taller-7/13.png)
+
+`DELETE /api/albumes/4` devolvió `204 No Content` con el cuerpo vacío.
+
+![DELETE del álbum 4 con respuesta 204](capturas/taller-7/14.png)
+
+Después del borrado, `GET /api/fotos/23` devolvió `200 OK` con la misma foto y `"album": null`. La clave foránea usa `ON DELETE SET NULL`.
+
+![GET de la foto 23 con album null después de eliminar su álbum](capturas/taller-7/15.png)
+
+#### Validar el título de una foto
+
+`POST /api/fotos` con `{"titulo": "", "calificacion": 4.5, "ruta": "https://picsum.photos/id/1/600/400"}` devolvió `400 Bad Request` con el mensaje «El título es obligatorio».
+
+![POST de una foto con título vacío y mensaje de validación en español](capturas/taller-7/16.png)
 
 ## Taller 6
 

@@ -59,3 +59,64 @@ DELETE {{api}}/fotos/{{crearFoto.response.body.$.id}}
 
 ### Comprobar que la foto eliminada devuelve 404
 GET {{api}}/fotos/{{crearFoto.response.body.$.id}}
+
+### Reto del Taller 7 · Crear un álbum
+# @name crearAlbum
+POST {{api}}/albumes
+Content-Type: application/json
+
+{
+  "nombre": "Paseo por el Malecón"
+}
+
+### Rechazar un nombre de álbum duplicado
+POST {{api}}/albumes
+Content-Type: application/json
+
+{
+  "nombre": "Paseo por el Malecón"
+}
+
+### Rechazar un nombre vacío
+POST {{api}}/albumes
+Content-Type: application/json
+
+{
+  "nombre": ""
+}
+
+### Cambiar el nombre del álbum
+PATCH {{api}}/albumes/{{crearAlbum.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "nombre": "Malecón al atardecer"
+}
+
+### Crear una foto en el álbum del reto
+# @name crearFotoReto
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "Atardecer en el Malecón",
+  "calificacion": 4.5,
+  "ruta": "https://picsum.photos/id/1/600/400",
+  "albumId": {{crearAlbum.response.body.$.id}}
+}
+
+### Eliminar el álbum del reto
+DELETE {{api}}/albumes/{{crearAlbum.response.body.$.id}}
+
+### Consultar la foto que quedó sin álbum
+GET {{api}}/fotos/{{crearFotoReto.response.body.$.id}}
+
+### Mostrar la validación del título en español
+POST {{api}}/fotos
+Content-Type: application/json
+
+{
+  "titulo": "",
+  "calificacion": 4.5,
+  "ruta": "https://picsum.photos/id/1/600/400"
+}
